@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+export http_proxy=http://172.17.0.1:7890
+export https_proxy=http://172.17.0.1:7890
+
 ##
 # Pre-requirements:
 # - env FUZZER: path to fuzzer work dir

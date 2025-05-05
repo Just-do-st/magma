@@ -1,0 +1,23 @@
+{
+  "results": {
+    "aflplusplus": {
+      "libpng": {
+        "fuzzer_png": {
+          "0": {
+            "reached": {
+              "PNG003": 180,
+              "PNG005": 180,
+              "PNG007": 180,
+              "PNG006": 13240,
+              "PNG001": 180
+            },
+            "triggered": {
+              "PNG007": 180,
+              "PNG001": 50200
+            }
+          }
+        }
+      }
+    }
+  }
+}

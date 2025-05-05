@@ -1,3 +1,5 @@
+set -exu
+
 export TARBALL_BASENAME="ball"
 
 echo_time() {
@@ -56,7 +58,7 @@ if [ ! -z "$MAGMA" ]; then
 
         for IPROGRAM in "${PROGRAMS[@]}"; do
             varname="${IPROGRAM}_ARGS"
-            declare DEFAULT_${ITARGET}_${IPROGRAM}_ARGS="${!varname}"
+            declare DEFAULT_${ITARGET}_${IPROGRAM}_ARGS="${!varname:-}"
         done
     done
     popd &> /dev/null

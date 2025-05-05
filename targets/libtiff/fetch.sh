@@ -1,4 +1,6 @@
 #!/bin/bash
+export http_proxy=http://172.17.0.1:7890
+export https_proxy=http://172.17.0.1:7890
 
 ##
 # Pre-requirements:

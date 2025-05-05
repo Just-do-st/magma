@@ -11,6 +11,14 @@
 #       unset)
 ##
 
+set -exu
+
+ISAN=${ISAN:-}
+HARDEN=${HARDEN:-}
+isan_flag=""
+harden_flag=""
+mode_flag=""
+
 if [ -z $FUZZER ] || [ -z $TARGET ]; then
     echo '$FUZZER and $TARGET must be specified as environment variables.'
     exit 1
@@ -41,7 +49,7 @@ if [ ! -z $HARDEN ]; then
     harden_flag="--build-arg harden=1"
 fi
 
-set -x
+# set -x
 docker build -t "$IMG_NAME" \
     --build-arg fuzzer_name="$FUZZER" \
     --build-arg target_name="$TARGET" \
@@ -49,6 +57,6 @@ docker build -t "$IMG_NAME" \
     --build-arg GROUP_ID=$(id -g $USER) \
     $mode_flag $isan_flag $harden_flag \
     -f "$MAGMA/docker/Dockerfile" "$MAGMA"
-set +x
+# set +x
 
 echo "$IMG_NAME"
