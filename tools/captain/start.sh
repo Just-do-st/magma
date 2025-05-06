@@ -2,6 +2,7 @@
 
 ##
 # Pre-requirements:
+# - env MAGMA_ROOT: root path of magma
 # - env FUZZER: fuzzer name (from fuzzers/)
 # - env TARGET: target name (from targets/)
 # - env PROGRAM: program name (name of binary artifact from $TARGET/build.sh)
@@ -53,6 +54,8 @@ fi
 
 if [ -t 1 ]; then
     docker run -dit $flag_volume \
+        --volume=sutong-exp:/out \
+        --volume="$MAGMA_ROOT/replay":/replay \
         --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
         --env=PROGRAM="$PROGRAM" --env=ARGS="$ARGS" \
         --env=FUZZARGS="$FUZZARGS" --env=POLL="$POLL" --env=TIMEOUT="$TIMEOUT" \

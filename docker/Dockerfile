@@ -42,6 +42,7 @@ RUN mkdir -p ${MAGMA} && chown magma:magma ${MAGMA}
 COPY --chown=magma:magma ${magma_root}/${magma_path} ${MAGMA}/
 RUN ${MAGMA}/preinstall.sh
 # USER magma:magma
+ENV DEBIAN_FRONTEND=noninteractive
 RUN ${MAGMA}/prebuild.sh
 
 ARG fuzzer_name
@@ -84,7 +85,5 @@ ENV LIBS -l:magma.o -lrt
 ENV LDFLAGS -L"${OUT}" -g
 
 RUN ${FUZZER}/instrument.sh
-
-COPY ${magma_root}/replay /
 
 ENTRYPOINT "${MAGMA}/run.sh"
