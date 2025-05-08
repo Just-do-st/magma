@@ -1,7 +1,0 @@
-target,program,bug,fuzzer,survival_time_reached,survival_ci_reached,survival_time_triggered,survival_ci_triggered
-libpng,fuzzer_png,PNG001,aflplusplus,180.0,249.46727240261396,50200.0,0.020681620243432446
-libpng,fuzzer_png,PNG003,aflplusplus,180.0,249.46727240261396,,
-libpng,fuzzer_png,PNG005,aflplusplus,180.0,249.46727240261396,,
-libpng,fuzzer_png,PNG006,aflplusplus,13240.0,0.09992816717336196,,
-libpng,fuzzer_png,PNG007,aflplusplus,180.0,249.46727240261396,180.0,249.46727240261396
-
