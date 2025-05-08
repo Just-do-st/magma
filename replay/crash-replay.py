@@ -9,20 +9,32 @@ import itertools
 import os
 import subprocess
 from collections import defaultdict
-
+import numpy as np
 
 # 根据采样间时间隔将 seed_dir 下的种子进行分组
+
+
 def generate_seed_group(seed_dir):
     global start_time
+    fuzzer = seed_dir.split("/")[2]
 
-    files = glob.glob(os.path.join(seed_dir, 'id:*'))
-    orig_files = [file for file in files if ',orig:' in file]
-    files = [file for file in files if ',orig:' not in file]
-    print(f"{len(orig_files)} origin + {len(files)} seeds")
+    if fuzzer == "ultrafuzz":
+        all_files = glob.glob(os.path.join(seed_dir, "**"), recursive=False)
+        # 过滤掉目录，仅保留文件
+        files = [f for f in all_files if os.path.isfile(f)]
+        orig_files = [file for file in files if 'init' in file]
+        files = [file for file in files if 'init' not in file]
+        print(f"{len(orig_files)} origin + {len(files)} seeds")
+    else:
+        files = glob.glob(os.path.join(seed_dir, 'id:*'))
+        orig_files = [file for file in files if ',orig:' in file]
+        files = [file for file in files if ',orig:' not in file]
+        print(f"{len(orig_files)} origin + {len(files)} seeds")
 
     sample_gap = 5  # second, default poll in magma
     if start_time == -1:
         cmdline_file = os.path.normpath(os.path.join(seed_dir, "../cmdline"))
+        # start_time = os.stat(cmdline_file).st_ctime
         start_time = os.stat(cmdline_file).st_mtime
 
     if not files:  # crash 和 hangs 可能没有种子
@@ -77,14 +89,14 @@ def magma_runonce(test_case):
         "watch",
         "--dump",
         "row",
-        "/replay/runonce.sh", # dockerfile中指定
+        "/replay/runonce.sh",  # dockerfile中指定
         test_case  # 测试用例文件
     ]
 
     # 捕获输出并解析
     try:
         # print(command_run_program)
-        result = subprocess.run(command_run_program, check=True,
+        result = subprocess.run(command_run_program, check=False,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
         output = result.stdout  # 获取标准输出内容
@@ -95,15 +107,15 @@ def magma_runonce(test_case):
         value_line = output.splitlines()[1]  # 第二行是值
 
         keys = header_line.split(',')
-        values = list(map(int, value_line.split(",")))
-
+        try:
+            values = list(map(int, value_line.split(",")))
+        except ValueError as e:
+            # print(f"not trigge bug")
+            return None
         return zip(keys, values)
 
-    except subprocess.CalledProcessError as e:
-        print(f"Error running program: {e}")
-        return None
-    except subprocess.TimeoutExpired as e:
-        print(f"Timeout expired while running program for {test_case}")
+    except Exception as e:
+        print(f"[!] Unexpected error: {e}")
         return None
 
 
@@ -118,22 +130,32 @@ def grouped_crash_info_by_time(seeds, thread=1):
         finished = 0
         for future in concurrent.futures.as_completed(futures):
             zip_ = future.result()  # 获取执行结果
-            for k, v in zip_:  # 计数
-                cur_crash_info[k] += v
+            if zip_:
+                for k, v in zip_:  # 计数
+                    cur_crash_info[k] += v
             finished = finished + 1
-            print(f"  Progress: {finished} / {total}", end='\r')
+            # print(f"  Progress: {finished} / {total}", end='\r')
 
 
 def get_all_instance_seeds(out_dir):
     result = []
     instance_list = []
 
-    # 汇总所有实例
-    for dir_name in os.listdir(out_dir):
-        dir_path = os.path.join(out_dir, dir_name)
-        # 排除当前目录
-        if os.path.isdir(dir_path):
-            instance_list.append(dir_path)
+    fuzzer = out_dir.split("/")[2]
+    if fuzzer == "aflteam":
+        instance_list.append(os.path.join(out_dir, "active_runs/monitor/"))
+    elif fuzzer == "ultrafuzz":
+        for dir_name in os.listdir(out_dir):  # 汇总所有实例
+            dir_path = os.path.join(out_dir, dir_name)
+            # 排除当前目录
+            if os.path.isdir(dir_path):
+                instance_list.append(os.path.join(dir_path, "default"))
+    else:
+        for dir_name in os.listdir(out_dir):  # 汇总所有实例
+            dir_path = os.path.join(out_dir, dir_name)
+            # 排除当前目录
+            if os.path.isdir(dir_path):
+                instance_list.append(dir_path)
 
     for instance_out_dir in instance_list:
         print(f"  [*] {instance_out_dir}")
@@ -146,7 +168,8 @@ def get_all_instance_seeds(out_dir):
         hangs_group = generate_seed_group(hangs_path)
         print(f"    [-] crashes\t", end="")
         crash_group = generate_seed_group(crash_path)
-        print(f'[group num] seeds:{len(queue_group)}, hangs:{len(hangs_group)}, crashes:{len(crash_group)}')
+        print(
+            f'[group num] seeds:{len(queue_group)}, hangs:{len(hangs_group)}, crashes:{len(crash_group)}')
 
         # 对齐种子group数量
         len_h = len(hangs_group)
@@ -159,13 +182,15 @@ def get_all_instance_seeds(out_dir):
             len_c += 1
 
         # 合并列表
-        merged_list = [list(itertools.chain(*pair)) for pair in zip(queue_group, hangs_group, crash_group)]
+        merged_list = [list(itertools.chain(*pair))
+                       for pair in zip(queue_group, hangs_group, crash_group)]
 
         # 将 results 和 merged_list 合并为一个新的二重列表
         if result == []:
             result = merged_list
         else:
-            result = [list(itertools.chain(*pair)) for pair in zip(result, merged_list)]
+            result = [list(itertools.chain(*pair))
+                      for pair in zip(result, merged_list)]
 
     return result
 
@@ -187,13 +212,14 @@ program_to_harness = {
 }
 
 
-
 def main():
     global work_dir  # 声明全局变量
     global cur_crash_info
+    global start_time
 
     """解析用户输入的命令行参数"""
-    parser = argparse.ArgumentParser(description="Coverage Statistics Automation Tool")
+    parser = argparse.ArgumentParser(
+        description="Coverage Statistics Automation Tool")
     parser.add_argument('--threads', type=int, required=True,
                         help='执行并行数 (e.g. --threads=10)')
     parser.add_argument(
@@ -226,28 +252,37 @@ def main():
         fuzzer = folder_name[1]
         target = folder_name[2]
         harness = program_to_harness[target]
-        monitor_dir = os.path.join(workdir,"ar",fuzzer,target,harness,exp_cycle_id,"monitor")
+        monitor_dir = os.path.join(
+            workdir, "ar", fuzzer, target, harness, exp_cycle_id, "monitor")
         monitor_dir = os.path.normpath(monitor_dir)
-        os.makedirs(monitor_dir, exist_ok=True)
-        
+        # 检查若文件夹存在，跳过
+        if not os.path.exists(monitor_dir):
+            os.makedirs(monitor_dir)
+        else:
+            print(f"[!] 文件夹存在，跳过 {monitor_dir}")
+            continue
+
         merged_list = get_all_instance_seeds(out_dir)
+        if np.array(merged_list, dtype=object).size == 0:
+            print("所有子列表均为空")
+            continue
 
         for i in range(0, len(merged_list)):
             seeds = merged_list[i]
             if seeds:
-                print(f'[*] process group {i}...')
+                print(
+                    f'[*] process group {i}, {len(seeds)} seeds...', end='\r')
                 grouped_crash_info_by_time(seeds, thread=threads)
                 time = (i + 1) * 5
                 # print(f"   {dict(cur_crash_info)}")
                 with open(os.path.join(monitor_dir, f"{time}"), "w") as f:
                     f.write(",".join(cur_crash_info.keys()) + "\n")
-                    f.write(",".join(str(cur_crash_info[k]) for k in cur_crash_info.keys()) + "\n")
-    print(dict(cur_crash_info))
+                    f.write(",".join(str(cur_crash_info[k])
+                                     for k in cur_crash_info.keys()) + "\n")
+    print("crash info: ", dict(cur_crash_info))
 
 
 if __name__ == '__main__':
     main()
 
-# python3 /crash-replay.py --threads=1 --workdir /out/magma-wrokdir --experiment_out_dirs /out/aflplusplus/0-aflplusplus-libpng/
-
-# {'PNG003_R': 64, 'PNG003_T': 0, 'PNG001_R': 65, 'PNG001_T': 1, 'PNG005_R': 64, 'PNG005_T': 0, 'PNG007_R': 64, 'PNG007_T': 64, 'PNG006_R': 3, 'PNG006_T': 0}
+# python3 /replay/crash-replay.py --threads=10 --workdir /out/magma-workdir --experiment_out_dirs /out/aflplusplus/1-aflplusplus-libpng/
